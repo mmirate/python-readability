@@ -7,6 +7,7 @@ import sys
 from collections import defaultdict
 from lxml.etree import tostring
 from lxml.etree import tounicode
+from lxml.etree import XPath
 from lxml.html import document_fromstring
 from lxml.html import fragment_fromstring
 
@@ -585,7 +586,7 @@ def main():
     enc = sys.__stdout__.encoding or 'utf-8'
     try:
         # Regexes below are from Pentadactyl
-        find_next_page = etree.XPath(r"""//a[ string-length(@href) != 0 and ( \
+        find_next_page = XPath(r"""//a[ string-length(@href) != 0 and ( \
             @rel = 'next' \
             or re:test(.,'^Next [>»]+','i') \
             or re:test(.,'^Next »','i') \
