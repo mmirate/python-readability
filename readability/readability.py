@@ -312,7 +312,7 @@ class Document:
     def class_weight(self, e):
         weight = 0
         if e.get('class', None):
-            if REGEXES['negativeRe'].search(e.get('class')):
+            if ['negativeRe'].search(e.get('class')):
                 weight -= 25
 
             if REGEXES['positiveRe'].search(e.get('class')):
@@ -563,6 +563,7 @@ class HashableElement():
     def __getattr__(self, tag):
         return getattr(self.node, tag)
 
+import urllib
 
 def main():
     from optparse import OptionParser
@@ -577,15 +578,38 @@ def main():
 
     file = None
     if options.url:
-        import urllib
         file = urllib.urlopen(options.url)
     else:
         file = open(args[0], 'rt')
     enc = sys.__stdout__.encoding or 'utf-8'
     try:
-        print Document(file.read(),
-            debug=options.verbose,
-            url=options.url).summary().encode(enc, 'replace')
+        # Regexes below are from Pentadactyl
+        find_next_page = etree.XPath(r"""//a[ string-length(@href) != 0 and ( \
+            @rel = 'next' \
+            or re:test(.,'^Next [>»]+','i') \
+            or re:test(.,'^Next »','i') \
+            or re:test(.,'\bnext\b','i') \
+            or re:test(.,'^>$','i') \
+            or re:test(.,'^(>>|»)$','i') \
+            or re:test(.,'^(>|»)','i') \
+            or re:test(.,'(>|»)$','i') \
+            or re:test(.,'\bmore\b'','i')\
+            )]/@href"""
+            , namespaces={'re':"http://exslt.org/regular-expressions"}
+        )
+        def process_file(f):
+            text_input = f.read()
+            clean_doc = Document(text_input,
+                debug=options.verbose,
+                url=options.url)
+            dirty_doc = build_doc(text_input)
+            del text_input
+            try:
+                clean_doc.append(process_file(urllib.urlopen(find_next_page(dirty_doc)[0]))[0])
+            except IndexError:
+                pass
+            return clean_doc
+        print process_file(file).summary().encode(enc, 'replace')
     finally:
         file.close()
 
