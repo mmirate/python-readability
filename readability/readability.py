@@ -314,7 +314,7 @@ class Document:
     def class_weight(self, e):
         weight = 0
         if e.get('class', None):
-            if ['negativeRe'].search(e.get('class')):
+            if REGEXES['negativeRe'].search(e.get('class')):
                 weight -= 25
 
             if REGEXES['positiveRe'].search(e.get('class')):
@@ -565,7 +565,7 @@ class HashableElement():
     def __getattr__(self, tag):
         return getattr(self.node, tag)
 
-import urllib
+import urllib, urlparse
 
 def main():
     from optparse import OptionParser
@@ -586,32 +586,30 @@ def main():
     enc = sys.__stdout__.encoding or 'utf-8'
     try:
         # Regexes below are from Pentadactyl
-        find_next_page = XPath(r"""//a[ string-length(@href) != 0 and ( \
-            @rel = 'next' \
-            or re:test(.,'^Next [>»]+','i') \
-            or re:test(.,'^Next »','i') \
-            or re:test(.,'\bnext\b','i') \
-            or re:test(.,'^>$','i') \
-            or re:test(.,'^(>>|»)$','i') \
-            or re:test(.,'^(>|»)','i') \
-            or re:test(.,'(>|»)$','i') \
-            or re:test(.,'\bmore\b'','i')\
-            )]/@href"""
+        find_next_page = XPath(ur""".//a[string-length(@href) != 0 and ( @rel = 'next' or re:test(.,'^Next [>»]+','i') or re:test(.,'^Next »','i') or re:test(.,'\bnext\b','i') or re:test(.,'^>$','i') or re:test(.,'^(>>|»)$','i') or re:test(.,'^(>|»)','i') or re:test(.,'(>|»)$','i') or re:test(.,'\bmore\b','i'))]/@href"""
             , namespaces={'re':"http://exslt.org/regular-expressions"}
         )
-        def process_file(f):
+        #def find_next_page(doc):
+            #for a in doc.iterfind(".//a"):
+                #if 'href' in a.attrib and a.attrib['href']:
+                    #if ('rel' in a.attrib and a.attrib['rel'] == 'next') or re.match():
+
+        def process_file(f,url):
             text_input = f.read()
             clean_doc = Document(text_input,
                 debug=options.verbose,
-                url=options.url)
+                url=url)
+            clean_doc.summary()
             dirty_doc = build_doc(text_input)
             del text_input
             try:
-                clean_doc.append(process_file(urllib.urlopen(find_next_page(dirty_doc)[0]))[0])
+                next_page = urlparse.urljoin(url,find_next_page(dirty_doc)[0])
+                if options.verbose: sys.stderr.write(next_page+"\n")
+                clean_doc.html.append(process_file(urllib.urlopen(next_page),next_page).html[0])
             except IndexError:
                 pass
             return clean_doc
-        print process_file(file).summary().encode(enc, 'replace')
+        print process_file(file,options.url).get_clean_html().encode(enc, 'replace')
     finally:
         file.close()
 
