@@ -599,12 +599,12 @@ def main():
             , namespaces={'re':"http://exslt.org/regular-expressions"}
         )
 
-        def process_file(f,url,keep_going=True):
+        def process_url(f,url,partial_html=False,keep_going=True):
             text_input = f.read()
             clean_doc = Document(text_input,
                 debug=options.verbose,
                 url=url)
-            clean_doc.summary()
+            clean_doc.summary(partial_html=partial_html,encoding=enc)
             dirty_doc = build_doc(text_input)
             del text_input
             if keep_going:
@@ -612,13 +612,16 @@ def main():
                     next_page = urlparse.urljoin(url,find_next_page(dirty_doc)[0])
                     if next_page not in visited_urls:
                         if options.verbose: sys.stderr.write(next_page+"\n")
-                        clean_doc.html.append(process_file(urllib.urlopen(next_page),next_page).html[0])
+                        if clean_doc.html.tag == 'html':
+                            clean_doc.html[0][-1].append(process_url(urllib.urlopen(next_page),next_page,partial_html=True).html[0])
+                        else:
+                            clean_doc.html.append(process_url(urllib.urlopen(next_page),next_page,partial_html=True).html[0])
                 except IndexError:
                     pass
                 else:
                     visited_urls.insert([next_page])
             return clean_doc
-        print process_file(file,options.url,options.depaginate).get_clean_html().encode(enc, 'replace')
+        print process_url(file,options.url,keep_going=options.depaginate).get_clean_html().encode(enc, 'replace')
     finally:
         file.close()
 
