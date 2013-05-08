@@ -128,11 +128,13 @@ class Document:
     def get_clean_html(self):
          return clean_attributes(tounicode(self.html))
 
-    def summary(self, html_partial=False):
+    def summary(self, html_partial=False, encoding='utf-8'):
         """Generate the summary of the html docuemnt
 
         :param html_partial: return only the div of the document, don't wrap
         in html and body tags.
+
+        :param encoding: the desired encoding declaration for the summary.
 
         """
         try:
@@ -152,7 +154,7 @@ class Document:
 
                 if best_candidate:
                     article = self.get_article(candidates, best_candidate,
-                            html_partial=html_partial)
+                            html_partial=html_partial, encoding=encoding)
                 else:
                     if ruthless:
                         log.debug("ruthless removal did not work. ")
@@ -185,7 +187,7 @@ class Document:
             log.exception('error getting summary: ')
             raise Unparseable(str(e)), None, sys.exc_info()[2]
 
-    def get_article(self, candidates, best_candidate, html_partial=False):
+    def get_article(self, candidates, best_candidate, html_partial=False, encoding='utf-8'):
         # Now that we have the top candidate, look through its siblings for
         # content that might also be related.
         # Things like preambles, content split by ads that we removed, etc.
@@ -228,6 +230,11 @@ class Document:
                     output.append(sibling)
                 else:
                     output.getchildren()[0].getchildren()[0].append(sibling)
+                    from lxml.html import builder as E
+                    meta = {'http-equiv':'Content-Type','content':'text/html; charset='+encoding}
+                    output.insert(0,E.HEAD(
+                        E.META(**meta),
+                        E.TITLE(self.short_title())))
         #if output is not None:
         #    output.append(best_elem)
         return output
@@ -572,6 +579,7 @@ def main():
     parser = OptionParser(usage="%prog: [options] [file]")
     parser.add_option('-v', '--verbose', action='store_true')
     parser.add_option('-u', '--url', default=None, help="use URL instead of a local file")
+    parser.add_option('-p', '--depaginate', default=None, help="remove pagination from a URL")
     (options, args) = parser.parse_args()
 
     if not (len(args) == 1 or options.url):
@@ -586,15 +594,11 @@ def main():
     enc = sys.__stdout__.encoding or 'utf-8'
     try:
         # Regexes below are from Pentadactyl
-        find_next_page = XPath(ur""".//a[string-length(@href) != 0 and ( @rel = 'next' or re:test(.,'^Next [>»]+','i') or re:test(.,'^Next »','i') or re:test(.,'\bnext\b','i') or re:test(.,'^>$','i') or re:test(.,'^(>>|»)$','i') or re:test(.,'^(>|»)','i') or re:test(.,'(>|»)$','i') or re:test(.,'\bmore\b','i'))]/@href"""
+        find_next_page = XPath(ur""".//a[string-length(@href) != 0 and starts-with(@href,'http') and ( @rel = 'next' or re:test(.,'^Next [>»]+','i') or re:test(.,'^Next »','i') or re:test(.,'\bnext\b','i') or re:test(.,'^>$','i') or re:test(.,'^(>>|»)$','i') or re:test(.,'^(>|»)','i') or re:test(.,'(>|»)$','i') or re:test(.,'\bmore\b','i'))]/@href"""
             , namespaces={'re':"http://exslt.org/regular-expressions"}
         )
-        #def find_next_page(doc):
-            #for a in doc.iterfind(".//a"):
-                #if 'href' in a.attrib and a.attrib['href']:
-                    #if ('rel' in a.attrib and a.attrib['rel'] == 'next') or re.match():
 
-        def process_file(f,url):
+        def process_file(f,url,keep_going=True):
             text_input = f.read()
             clean_doc = Document(text_input,
                 debug=options.verbose,
@@ -602,14 +606,15 @@ def main():
             clean_doc.summary()
             dirty_doc = build_doc(text_input)
             del text_input
-            try:
-                next_page = urlparse.urljoin(url,find_next_page(dirty_doc)[0])
-                if options.verbose: sys.stderr.write(next_page+"\n")
-                clean_doc.html.append(process_file(urllib.urlopen(next_page),next_page).html[0])
-            except IndexError:
-                pass
+            if keep_going:
+                try:
+                    next_page = urlparse.urljoin(url,find_next_page(dirty_doc)[0])
+                    if options.verbose: sys.stderr.write(next_page+"\n")
+                    clean_doc.html.append(process_file(urllib.urlopen(next_page),next_page).html[0])
+                except IndexError:
+                    pass
             return clean_doc
-        print process_file(file,options.url).get_clean_html().encode(enc, 'replace')
+        print process_file(file,options.url,options.depaginate).get_clean_html().encode(enc, 'replace')
     finally:
         file.close()
 
