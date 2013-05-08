@@ -594,7 +594,7 @@ def main():
     enc = sys.__stdout__.encoding or 'utf-8'
     try:
         # Regexes below are from Pentadactyl
-        find_next_page = XPath(ur""".//a[string-length(@href) != 0 and starts-with(@href,'http') and ( @rel = 'next' or re:test(.,'^Next [>»]+','i') or re:test(.,'^Next »','i') or re:test(.,'\bnext\b','i') or re:test(.,'^>$','i') or re:test(.,'^(>>|»)$','i') or re:test(.,'^(>|»)','i') or re:test(.,'(>|»)$','i') or re:test(.,'\bmore\b','i'))]/@href"""
+        find_next_page = XPath(ur""".//a[string-length(@href) != 0 and (not starts-with(@href,'javascript:')) and ( @rel = 'next' or re:test(.,'^Next [>»]+','i') or re:test(.,'^Next »','i') or re:test(.,'\bnext\b','i') or re:test(.,'^>$','i') or re:test(.,'^(>>|»)$','i') or re:test(.,'^(>|»)','i') or re:test(.,'(>|»)$','i') or re:test(.,'\bmore\b','i'))]/@href"""
             , namespaces={'re':"http://exslt.org/regular-expressions"}
         )
 
