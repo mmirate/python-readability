@@ -593,6 +593,7 @@ def main():
         file = open(args[0], 'rt')
     enc = sys.__stdout__.encoding or 'utf-8'
     try:
+        visited_urls = set()
         # Regexes below are from Pentadactyl
         find_next_page = XPath(ur""".//a[string-length(@href) != 0 and (not starts-with(@href,'javascript:')) and ( @rel = 'next' or re:test(.,'^Next [>»]+','i') or re:test(.,'^Next »','i') or re:test(.,'\bnext\b','i') or re:test(.,'^>$','i') or re:test(.,'^(>>|»)$','i') or re:test(.,'^(>|»)','i') or re:test(.,'(>|»)$','i') or re:test(.,'\bmore\b','i'))]/@href"""
             , namespaces={'re':"http://exslt.org/regular-expressions"}
@@ -609,10 +610,13 @@ def main():
             if keep_going:
                 try:
                     next_page = urlparse.urljoin(url,find_next_page(dirty_doc)[0])
-                    if options.verbose: sys.stderr.write(next_page+"\n")
-                    clean_doc.html.append(process_file(urllib.urlopen(next_page),next_page).html[0])
+                    if next_page not in visited_urls:
+                        if options.verbose: sys.stderr.write(next_page+"\n")
+                        clean_doc.html.append(process_file(urllib.urlopen(next_page),next_page).html[0])
                 except IndexError:
                     pass
+                else:
+                    visited_urls.insert([next_page])
             return clean_doc
         print process_file(file,options.url,options.depaginate).get_clean_html().encode(enc, 'replace')
     finally:
